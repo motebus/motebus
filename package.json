@@ -1,0 +1,21 @@
+{
+  "name": "motebus",
+  "version": "1.0.1",
+  "description": "MoteBus SDK for node.js",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/motebus/motebus"
+  },
+  "keywords": [
+    "MoteBus"
+  ],
+  "author": "Richard Ho",
+  "license": "ISC",
+  "homepage": "https://github.com/motebus/motebus"
+}
