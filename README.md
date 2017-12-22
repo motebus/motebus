@@ -73,6 +73,6 @@ Extract function is for saving the file received to the PATH you defined.
     
     xmsg.extract("MESSAGE_ID","PATH","CALLBACK");
         "MESSAGE_ID"          expect a string of the senders DDN
-        "PATH"                expect a string of the stored file path
+        "PATH"                expect a string of the stored file path
         "CALLBACK"            expect a defined function for callback action 
 
