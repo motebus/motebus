@@ -2,6 +2,9 @@
 
 MoteBus is a message transport bus for peer-to-peer communication. It supports xMsg, xRPC protocols.
 
+To use this package, it is neccessary to acquire the motebus binary file from www.ypcloud.com/download/motebus.zip
+
+
 ### Install 
 
     npm install motebus
@@ -32,7 +35,7 @@ Call function will call the function that has been published
         "FUNCTION"            expect a string as the function name in App
         "ARGUMENT"            expect a list of dictionary format of variable such as {"A":"12","B":"25"}
         "PRIO"                expect an Interger to indicate the priority of request
-        "TIMEOUT1"            expect an Interger to indicate the maximum sending waiting time
+        "TIMEOUT1"            expect an Interger to indicate the maximum sending time
         "TIMEOUT2"            expect an Interger to indicate the maximum reply waiting time
    
 ### xMsg
@@ -54,7 +57,7 @@ Send function send the message to the target you defined
         "BODY"                expect a string of message
         "FILES"               expect a string of the file path
         "PRIO"                expect an Interger to indicate the priority of request
-        "TIMEOUT1"            expect an Interger to indicate the maximum sending waiting time
+        "TIMEOUT1"            expect an Interger to indicate the maximum sending time
         "TIMEOUT2"            expect an Interger to indicate the maximum reply waiting time
         "CALLBACK"            expect a defined function for callback action 
         
@@ -65,7 +68,7 @@ Reply function is used to reply the message received
         "BODY"                expect a string of message
         "FILES"               expect a string of the file path
         "PRIO"                expect an Interger to indicate the priority of request
-        "TIMEOUT1"            expect an Interger to indicate the maximum sending waiting time
+        "TIMEOUT1"            expect an Interger to indicate the maximum sending time
         "TIMEOUT2"            expect an Interger to indicate the maximum reply waiting time
         "CALLBACK"            expect a defined function for callback action 
 
