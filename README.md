@@ -1,6 +1,6 @@
 # motebus
 
-MoteBus is a message transport bus for peer-to-peer communication. It supports xMsg, xRPC, xOBJ and xSync protocols.
+MoteBus is a message transport bus for peer-to-peer communication. It supports xMsg, xRPC protocols.
 
 ### Install 
 
@@ -32,8 +32,8 @@ Call function will call the function that has been published
         "FUNCTION"            expect a string as the function name in App
         "ARGUMENT"            expect a list of dictionary format of variable such as {"A":"12","B":"25"}
         "PRIO"                expect an Interger to indicate the priority of request
-        "TIMEOUT1"            expect an Interger to indicate the time to retry
-        "TIMEOUT2"            expect an Interger to indicate the time to disconnect if not responsed
+        "TIMEOUT1"            expect an Interger to indicate the maximum sending waiting time
+        "TIMEOUT2"            expect an Interger to indicate the maximum reply waiting time
    
 ### xMsg
     xmsg = motebus.xMsg();
@@ -54,8 +54,8 @@ Send function send the message to the target you defined
         "BODY"                expect a string of message
         "FILES"               expect a string of the file path
         "PRIO"                expect an Interger to indicate the priority of request
-        "TIMEOUT1"            expect an Interger to indicate the time to retry
-        "TIMEOUT2"            expect an Interger to indicate the time to disconnect if not responsed
+        "TIMEOUT1"            expect an Interger to indicate the maximum sending waiting time
+        "TIMEOUT2"            expect an Interger to indicate the maximum reply waiting time
         "CALLBACK"            expect a defined function for callback action 
         
 Reply function is used to reply the message received
@@ -65,8 +65,8 @@ Reply function is used to reply the message received
         "BODY"                expect a string of message
         "FILES"               expect a string of the file path
         "PRIO"                expect an Interger to indicate the priority of request
-        "TIMEOUT1"            expect an Interger to indicate the time to retry
-        "TIMEOUT2"            expect an Interger to indicate the time to disconnect if not responsed
+        "TIMEOUT1"            expect an Interger to indicate the maximum sending waiting time
+        "TIMEOUT2"            expect an Interger to indicate the maximum reply waiting time
         "CALLBACK"            expect a defined function for callback action 
 
 Extract function is for saving the file received to the PATH you defined. 
