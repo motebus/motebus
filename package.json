@@ -1,6 +1,6 @@
 {
   "name": "motebus",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "MoteBus SDK for node.js",
   "main": "index.js",
   "dependencies": {},
