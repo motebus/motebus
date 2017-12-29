@@ -46,7 +46,7 @@ The open function sets the current user as available
 
     xmsg.open("ALIAS","PASSWORD","UNIQUE","CALLBACK");
         "ALIAS"               expects a string of the ID published on the network
-        "PASSWORD"            expects a password string, can be left blank
+        "PASSWORD"            expects a password string, can be left blank
         "UNIQUE"              expects a string of "true" or "false", permission for duplicated ALIAS ID 
         "CALLBACK"            expects a defined function for callback action 
         
