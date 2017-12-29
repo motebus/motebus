@@ -11,71 +11,71 @@ To use this package, it is necessary to acquire the motebus binary file from www
     
 ### Usage
 
-Import the motebus module to the code
+Add the motebus module to the code
     
     motebus = require('motebus');
    
-The module mainly contain two class, xRPC, xMsg
+The module mainly contains two classes: xRPC and xMsg
 
 ### xRPC   
     xrpc = motebus.xRPC();
 
-xRPC contain two functions
+xRPC contains two functions
 
-Publish function will publish the app which contain your functions on to the motebus network. 
+The publish function will publish the app which contains your functions on the motebus network. 
     
     xrpc.publish("APPNAME","MODULE");
-        "APPNAME"             expect a string of the appname being defined in your program
-        "MODULE"              expect a string of the function defined inside the appname, multi function is possible.
+        "APPNAME"             expects a string of the appname being defined in your program
+        "MODULE"              expects a string of the function defined inside the appname, multi functions are possible.
 
-Call function will call the function that has been published 
+The call function will call the function that has been published 
     
     xrpc.call("TARGET","FUNCTION","ARGUMENTS","PRIO","TIMEOUT1","TIMEOUT2");
-        "TARGET"              expect a string of MMA, which contain "APPNAME"@"IP"
-        "FUNCTION"            expect a string as the function name in App
-        "ARGUMENT"            expect a list of dictionary format of variable such as {"A":"12","B":"25"}
-        "PRIO"                expect an Interger to indicate the priority of request
-        "TIMEOUT1"            expect an Interger to indicate the maximum sending time
-        "TIMEOUT2"            expect an Interger to indicate the maximum reply waiting time
+        "TARGET"              expects a string of MMA, which contains "APPNAME"@"IP"
+        "FUNCTION"            expects a string as the function name in App
+        "ARGUMENT"            expects a list in dictionary format such as {"A":"12","B":"25"}
+        "PRIO"                expects an Integer to indicate the priority of the request
+        "TIMEOUT1"            expects an Integer to indicate the maximum sending time
+        "TIMEOUT2"            expects an Integer to indicate the maximum reply waiting time
    
 ### xMsg
     xmsg = motebus.xMsg();
-xMsg contain 4 functions
+xMsg contains 4 functions
 
-Open function publish the current user as available
+The open function sets the current user as available
 
     xmsg.open("ALIAS","PASSWORD","UNIQUE","CALLBACK");
-        "ALIAS"               expect a string of the ID published on the network
-        "PASSWORD"            expect a string of password for entry, can be left blank
-        "UNIQUE"              expect a string of "true" or "false", permission for duplicated ALIAS ID 
-        "CALLBACK"            expect a defined function for callback action 
+        "ALIAS"               expects a string of the ID published on the network
+        "PASSWORD"            expects a password string, can be left blank
+        "UNIQUE"              expects a string of "true" or "false", permission for duplicated ALIAS ID 
+        "CALLBACK"            expects a defined function for callback action 
         
-Send function send the message to the target you defined
+The send function sends the message to the previously defined target
 
     xmsg.send("TARGET","BODY","FILES","PRIO","TIMEOUT1","TIMEOUT2","CALLBACK");
-        "TARGET"              expect a string of MMA, which contain "APPNAME"@"IP"
-        "BODY"                expect a string of message
-        "FILES"               expect a string of the file path
-        "PRIO"                expect an Interger to indicate the priority of request
-        "TIMEOUT1"            expect an Interger to indicate the maximum sending time
-        "TIMEOUT2"            expect an Interger to indicate the maximum reply waiting time
-        "CALLBACK"            expect a defined function for callback action 
+        "TARGET"              expects a string of MMA, which contains "APPNAME"@"IP"
+        "BODY"                expects a string of the message
+        "FILES"               expects a string of the file path
+        "PRIO"                expects an Integer to indicate the priority of the request
+        "TIMEOUT1"            expects an Integer to indicate the maximum sending time
+        "TIMEOUT2"            expects an Integer to indicate the maximum reply waiting time
+        "CALLBACK"            expects a defined function for callback action 
         
-Reply function is used to reply the message received
+The reply function is used to reply to the received message
 
     xmsg.reply("HEAD","BODY","FILES","PRIO","TIMEOUT1","TIMEOUT2","CALLBACK");
-        "HEAD"                expect a string of MMA, which contain "APPNAME"@"IP"
-        "BODY"                expect a string of message
-        "FILES"               expect a string of the file path
-        "PRIO"                expect an Interger to indicate the priority of request
-        "TIMEOUT1"            expect an Interger to indicate the maximum sending time
-        "TIMEOUT2"            expect an Interger to indicate the maximum reply waiting time
-        "CALLBACK"            expect a defined function for callback action 
+        "HEAD"                expects a string of MMA, which contains "APPNAME"@"IP"
+        "BODY"                expects a string of the message
+        "FILES"               expects a string of the file path
+        "PRIO"                expects an Integer to indicate the priority of request
+        "TIMEOUT1"            expects an Integer to indicate the maximum sending time
+        "TIMEOUT2"            expects an Integer to indicate the maximum reply waiting time
+        "CALLBACK"            expects a defined function for callback action 
 
-Extract function is for saving the file received to the PATH you defined. 
+The extract function is for saving the file received to the PATH you defined. 
     
     xmsg.extract("MESSAGE_ID","PATH","CALLBACK");
-        "MESSAGE_ID"          expect a string of the senders DDN
-        "PATH"                expect a string of the stored file path
-        "CALLBACK"            expect a defined function for callback action 
+        "MESSAGE_ID"          expects a string of the senders DDN
+        "PATH"                expects a string of the stored file path
+        "CALLBACK"            expects a defined function for callback action 
 
