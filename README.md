@@ -2,7 +2,7 @@
 
 MoteBus is a message transport bus for peer-to-peer communication. It supports xMsg, xRPC protocols.
 
-To use this package, it is necessary to acquire the motebus binary file from www.ypcloud.com/download/motebus.zip
+To use this package, it is necessary to acquire the motebus binary file from https://www.ypcloud.com/download/motebus.zip
 
 
 ### Install 
