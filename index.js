@@ -87,12 +87,12 @@ class MoteBus extends EventEmitter {
   }
 
   regMMA(idCode,obj) {
-    console.log('regMMA( %s )', idCode);
+    //console.log('regMMA( %s )', idCode);
     this.MMA[idCode] = obj;
   }
 
   unregMMA(idCode) {
-    console.log('unregMMA( %s )', idCode);
+    //console.log('unregMMA( %s )', idCode);
     delete this.MMA[idCode];
   }
 
@@ -160,7 +160,6 @@ class MoteBus extends EventEmitter {
     });
   }
 
-
   hostUnlink(target) {
     var self = this;
     return new Promise(function(resolve, reject){
@@ -174,6 +173,34 @@ class MoteBus extends EventEmitter {
     });
   }
 
+  hostCluster(target, serverlist, smode) {
+    var self = this;
+    return new Promise(function(resolve, reject){
+      self.jrpc.call('CORE.HostCluster',target, serverlist, smode)
+      .then((result)=>{
+        resolve(result);
+      })
+      .catch((err)=>{
+        reject(err);
+      });
+    });
+  }
+
+  startUp(apiIp, apiPort) {
+    var self = this;
+    var host, port;
+    if (apiIp) {
+      host = apiIp;
+      if (apiPort)
+        port = apiPort;
+      else 
+        port = 6060;
+    } else {
+      host = "127.0.0.1";
+      port = 6060;
+    }
+    self.jrpc.connectTo( host, port );
+  }
 }
 
 //=========================================

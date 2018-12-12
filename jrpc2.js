@@ -4,14 +4,14 @@ const EventEmitter = require('events');
 
 const JRPCConnectTimeout = 3000;
 const JRPCReconnectTime = 2000;
-//const JRPCServerAddress = '192.168.0.58';
-const JRPCServerAddress = '127.0.0.1';
-const JRPCServerPort = 6060;
 
 var jRPCInst;
+var jRPCip = '127.0.0.1';
+var jRPCport = 6060;
 var jRPCConn;
 var jRPCActive = false;
 var jRPCLineBuffer = '';
+
 
 var indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
@@ -41,7 +41,6 @@ class JRPC2 extends EventEmitter {
 		self.methodArgs = {};
 		self.modules = {};
 		self.context = {};
-		setImmediate(SocketHandle);
 		jRPCInst = self;
 	}
 
@@ -242,6 +241,12 @@ class JRPC2 extends EventEmitter {
 	get isConnected() {
 		return jRPCActive;
 	}
+
+	connectTo( ip, port ) {
+		jRPCip = ip;
+		jRPCport = port;
+		setImmediate(SocketHandle);
+	}
 }
 
 
@@ -250,9 +255,9 @@ function SocketHandle() {
 		var self = this;
 
 		jRPCConn = new net.Socket(); 
-		//console.log('connecting');
+		//console.log('connecting...', jRPCip, ":", jRPCport);
 		jRPCConn.setEncoding('utf8');
-		jRPCConn.connect(JRPCServerPort, JRPCServerAddress, ()=>{
+		jRPCConn.connect(jRPCport, jRPCip, ()=>{
 			clearTimeout(waitTimer);
 			//console.log('connected');
 			jRPCActive = true;
