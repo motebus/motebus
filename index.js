@@ -2,8 +2,10 @@
 
 var util = require('util')
 var JRPC2 = require('./jrpc2');
+var path = require('path');
 
 const EventEmitter = require('events');
+const Def_StackPort = 6262;
 
 var TKState = { 
   None: 'None', 
@@ -23,20 +25,29 @@ class MoteBus extends EventEmitter {
 
   constructor() {
     super();
-    var self = this;
-    self._Connected = false;
+    let self = this;
+    self._stackConnOK = false;
+    self._appName = "";
+    self._multiInst = false;
     self.MMA = {};
     self.modules = {};
-    self.jrpc = JRPC2.create()
+    self.stackConn = JRPC2.create()
     .on('connect',()=>{
       //console.log('MoteBus.connected.');
       self.MMA = {};
       self.modules = {};
-      self._Connected = true;
-      self.emit('ready');
+
+      self.stackConn.call('CORE.Startup', self._appName, self._multiInst)
+      .then((result)=>{
+        self._stackConnOK = true;
+        self.emit('ready');
+      })
+      .catch((err)=>{
+        console.log("Error: Unable to connect MoteBus. ", err);
+      });
     })
     .on('disconnect',()=>{
-      self._Connected = false;
+      self._stackConnOK = false;
       self.emit('off');
       //console.log('MoteBus.disconnected.');
     })
@@ -77,13 +88,29 @@ class MoteBus extends EventEmitter {
 
       return func.apply(self, params);
     })
-    .expose('CORE.RecvHostState', function(udid,online){
+    .expose('XSHARE.RecvConfigChanged', function(catlog, keypath){
+      if (self._xshare) 
+        self._xshare.emit('configChanged', catlog, keypath);
+      return "OK";
+    })
+    .expose('XSHARE.RecvSecretChanged', function(catlog, keypath){
+      if (self._xshare) 
+        self._xshare.emit('secretChanged', catlog, keypath);
+      return "OK";
+    })
+    .expose('XSHARE.RecvBucketChanged', function(catlog, storename){
+      if (self._xshare) 
+        self._xshare.emit('bucketChanged', catlog, storename);
+      return "OK";
+    })
+    .expose('CORE.RecvHostState', function(udid,online,reason){
       /*
       console.log('CORE.RecvConnEvent( %s, %s )', udid, online);
       */
-      self.emit('hostState',udid,online);
+      self.emit('hostState', udid, online, reason);
       return "OK";
     });
+
   }
 
   regMMA(idCode,obj) {
@@ -104,102 +131,75 @@ class MoteBus extends EventEmitter {
     return new XRPC(this);
   }
 
+  xSHARE() {
+    let self = this;
+    if (!self._xshare)
+      self._xshare = new XSHARE(this);
+    return self._xshare;
+  }
+
   getInfo() {
-    var self = this;
-    return new Promise(function(resolve, reject){
-      self.jrpc.call('CORE.GetInfo')
-      .then((result)=>{
-        resolve(result);
-      })
-      .catch((err)=>{
-        reject(err);
-      });
-    });
+    let self = this;
+    return self.stackConn.call('CORE.GetInfo');
   }
 
   isReady() {
-    return _Connected;
+    return _stackConnOK;
   }
 
   getHostInfo(keyword) {
-    var self = this;
-    return new Promise(function(resolve, reject){
-      self.jrpc.call('CORE.HostInfo',keyword)
-      .then((result)=>{
-        resolve(result);
-      })
-      .catch((err)=>{
-        reject(err);
-      });
-    });
+    let self = this;
+    return self.stackConn.call('CORE.HostInfo',keyword);
   }
 
   getHostList() {
-    var self = this;
-    return new Promise(function(resolve, reject){
-      self.jrpc.call('CORE.HostList','')
-      .then((result)=>{
-        resolve(result);
-      })
-      .catch((err)=>{
-        reject(err);
-      });
-    });
+    let self = this;
+    return self.stackConn.call('CORE.HostList','');
   }
 
   hostLink(target, conCount, retries) {
-    var self = this;
-    return new Promise(function(resolve, reject){
-      self.jrpc.call('CORE.HostLink',target, conCount, retries)
-      .then((result)=>{
-        resolve(result);
-      })
-      .catch((err)=>{
-        reject(err);
-      });
-    });
+    let self = this;
+    return self.stackConn.call('CORE.HostLink',target, conCount, retries);
   }
 
   hostUnlink(target) {
-    var self = this;
-    return new Promise(function(resolve, reject){
-      self.jrpc.call('CORE.HostUnlink',target)
-      .then((result)=>{
-        resolve(result);
-      })
-      .catch((err)=>{
-        reject(err);
-      });
-    });
+    let self = this;
+    return self.stackConn.call('CORE.HostUnlink',target);
   }
 
   hostCluster(target, serverlist, smode) {
-    var self = this;
-    return new Promise(function(resolve, reject){
-      self.jrpc.call('CORE.HostCluster',target, serverlist, smode)
-      .then((result)=>{
-        resolve(result);
-      })
-      .catch((err)=>{
-        reject(err);
-      });
-    });
+    let self = this;
+    return self.stackConn.call('CORE.HostCluster',target, serverlist, smode);
   }
 
-  startUp(apiIp, apiPort) {
-    var self = this;
-    var host, port;
-    if (apiIp) {
-      host = apiIp;
-      if (apiPort)
-        port = apiPort;
-      else 
-        port = 6060;
+  startUp(stackIp, stackPort, appName, multiInst) {
+    let self = this;
+    var bsHost, bsPort, apName;
+
+    if (stackIp)
+      bsHost = stackIp;
+    else
+      bsHost = "127.0.0.1";
+
+    if (stackPort)
+      bsPort = stackPort;
+    else 
+      bsPort = Def_StackPort;
+
+    if (appName) {
+      self._appName = appName;  
     } else {
-      host = "127.0.0.1";
-      port = 6060;
+      self._appName = path.basename(require.main.filename, ".js");
     }
-    self.jrpc.connectTo( host, port );
+    
+    if (multiInst) {
+      self._multiInst = multiInst;  
+    }
+
+    //console.log(bsHost, bsPort);
+
+    if ((bsHost!="") && (bsPort!=0))
+      self.stackConn.connectTo( bsHost, bsPort, "mbStack" );
   }
 }
 
@@ -208,7 +208,7 @@ class XMSG extends EventEmitter {
 
   constructor(owner) {
     super();
-    var self = this;
+    let self = this;
     //console.log("XMSG.create()");
     self.owner = owner;
     self.idCode = '';
@@ -216,13 +216,13 @@ class XMSG extends EventEmitter {
   }
 
   recvMessage(msg) {
-    var self = this;
+    let self = this;
     //console.log('XMsg.recvMessage( %s )', util.inspect(msg,false,null));
     self.emit("message",msg);
   }
 
   recvTKInfo(info) {
-    var self = this;
+    let self = this;
     //console.log('XMsg.recvTKInfo( %s )', util.inspect(info,false,null));
     var cb = self.trackCB[info.id];
     if ((cb!=null) && typeof cb === 'function') {
@@ -235,9 +235,9 @@ class XMSG extends EventEmitter {
 
 
   open(alias, password, unque, callback) {
-    var self = this;
+    let self = this;
     //console.log("XMSG.open(%s,%s,%s)", alias, password, unque);
-    self.owner.jrpc.call('XMSG.Open', alias, password, unque )
+    self.owner.stackConn.call('XMSG.Open', alias, password, unque )
     .then((result)=>{
         if (self.idCode != '')
           self.owner.unregMMA(self.idCode);
@@ -255,13 +255,13 @@ class XMSG extends EventEmitter {
 
 
   send(target, body, files, prio, timeout1, timeout2, callback) {
-    var self = this;
+    let self = this;
     /*
     console.log("XMSG.send(%s, %s, %s, %s, %d, %d, %d)", 
       self.idCode, target, util.inspect(body,false,null),
       util.inspect(files,false,null), prio, timeout1, timeout2);
     */
-    self.owner.jrpc.call('XMSG.Send', self.idCode, target, body, files, prio, timeout1, timeout2 )
+    self.owner.stackConn.call('XMSG.Send', self.idCode, target, body, files, prio, timeout1, timeout2 )
     .then((result)=>{
       //console.log('XMsg.send result=', result);
       self.trackCB[result] = callback;
@@ -274,14 +274,14 @@ class XMSG extends EventEmitter {
 
 
   reply(head, body, files, prio, timeout1, timeout2, callback) {
-    var self = this;
+    let self = this;
     /*
     console.log("XMSG.reply(%s, %s, %s, %d, %d)", 
       util.inspect(head,false,null),
       util.inspect(body,false,null),
       util.inspect(files,false,null),prio,timeout1,timeout2);
     */
-    self.owner.jrpc.call('XMSG.Reply', self.idCode, head, body, files, prio, timeout1, timeout2 )
+    self.owner.stackConn.call('XMSG.Reply', self.idCode, head, body, files, prio, timeout1, timeout2 )
     .then((result)=>{
       //console.log('XMsg.reply result=', result);
       self.trackCB[result] = callback;
@@ -293,10 +293,10 @@ class XMSG extends EventEmitter {
   }
 
   extract(msgid, path, callback) {
-    var self = this;
+    let self = this;
     //console.log("XMSG.extract(%s, %s)", msgid, path); 
 
-    self.owner.jrpc.call('XMSG.Extract', self.idCode, msgid, path )
+    self.owner.stackConn.call('XMSG.Extract', self.idCode, msgid, path )
     .then((result)=>{
       callback(null,result);
     })
@@ -315,13 +315,13 @@ class XRPC extends EventEmitter {
   constructor(owner) {
     super();
     //console.log("XRPC.create()");
-    var self = this;
+    let self = this;
     self.owner = owner;
   }
 
   publish(appname, module) {
     //console.log("XRPC.publish()");
-    var self = this;
+    let self = this;
     var methodName;
     for (methodName in module) {
       if ((typeof module[methodName] == "function") && (methodName !== "constructor")) {
@@ -333,34 +333,22 @@ class XRPC extends EventEmitter {
     }
 
     var names = Object.keys(self.owner.modules[appname]);
-    return new Promise(function(resolve, reject){
-      self.owner.jrpc.call("XRPC.Publish", appname, names).then((result)=>{
-        resolve(result);
-      }).catch((err)=>{
-        reject(err);
-      });
-    });
+    return self.owner.stackConn.call("XRPC.Publish", appname, names);
   }
 
   unpublish(appname) {
     //console.log("XRPC.unpublish()");
-    var self = this;
-    return new Promise(function(resolve, reject){
-      self.owner.jrpc.call("XRPC.Unpublish", appname).then((result)=>{
-        resolve(result);
-      }).catch((err)=>{
-        reject(err);
-      });
-    });
+    let self = this;
+    return self.owner.stackConn.call("XRPC.Unpublish", appname);
   }
 
 
   isolated(module) {
     //console.log("XRPC.publish()");
-    var self = this;
+    let self = this;
     var names = Object.keys(module);
     return new Promise(function(resolve, reject){
-      self.owner.jrpc.call("XRPC.Isolated", names).then((userId)=>{
+      self.owner.stackConn.call("XRPC.Isolated", names).then((userId)=>{
         if (userId && userId.length>0) {
           var methodName;
           for (methodName in module) {
@@ -384,11 +372,11 @@ class XRPC extends EventEmitter {
 
   call(target, funname, args, prio, timeout1, timeout2) {
     //console.log("XRPC.call()");
-    var self = this;
+    let self = this;
     var rpc = {'method': funname,
                'params': args};
     return new Promise(function(resolve, reject){
-      self.owner.jrpc.call("XRPC.SendCall", target, rpc, prio, timeout1, timeout2).then((res)=>{
+      self.owner.stackConn.call("XRPC.SendCall", target, rpc, prio, timeout1, timeout2).then((res)=>{
         if (res.error)
           reject(res.error);  
         else
@@ -402,6 +390,112 @@ class XRPC extends EventEmitter {
 }
 
 
+class XSHARE extends EventEmitter {
+  constructor(owner) {
+    super();
+    let self = this;
+    self.owner = owner;
+  }
+
+  //var xshare = motebus.xSHARE();
+  getConfig(catlog, keypath) {
+    let self = this;
+    //console.log("XSHARE.getConfig(%s, %s)", catlog, keypath); 
+    return self.owner.stackConn.call("XSHARE.GetConfig", catlog, keypath);
+  }
+
+  setConfig(catlog, keypath, value) {
+    let self = this;
+    //console.log("XSHARE.setConfig(%s, %s, %s)", catlog, keypath, value); 
+    return self.owner.stackConn.call("XSHARE.SetConfig", catlog, keypath, value);
+  }
+  //xshare.on('configChanged', (catlog, keypath)=>{});
+
+  getSecret(catlog, keypath, password) {
+    let self = this;
+    //console.log("XSHARE.getSecret(%s, %s, %s)", catlog, keypath, password); 
+    return self.owner.stackConn.call("XSHARE.GetSecret", catlog, keypath, password);
+  }
+
+  setSecret(catlog, keypath, value, password) {
+    let self = this;
+    //console.log("XSHARE.setSecret(%s, %s, %s, %s)", catlog, keypath, value, password); 
+    return self.owner.stackConn.call("XSHARE.SetSecret", catlog, keypath, value, password);
+  }
+  //xshare.on('secretChanged', (catlog, keypath)=>{});
+
+
+  getCached(catlog, idname) {
+    let self = this;
+    //console.log("XSHARE.getCached(%s, %s)", catlog, idname); 
+    return self.owner.stackConn.call("XSHARE.GetCached", catlog, idname);
+  }
+
+  setCached(catlog, idname, value) {
+    let self = this;
+    //console.log("XSHARE.setCached(%s, %s, %s)", catlog, idname, value); 
+    return self.owner.stackConn.call("XSHARE.SetCached", catlog, idname, value);
+  }
+
+  removeCached(catlog, idname) {
+    let self = this;
+    //console.log("XSHARE.removeCached(%s, %s)", catlog, idname); 
+    return self.owner.stackConn.call("XSHARE.RemoveCached", catlog, idname);
+  }
+
+  clearCached(catlog) {
+    let self = this;
+    //console.log("XSHARE.clearCached(%s)", catlog); 
+    return self.owner.stackConn.call("XSHARE.ClearCached", catlog);
+  }
+
+
+
+  getBucket(catlog, storeName) {
+    let self = this;
+    //console.log("XSHARE.getBucket(%s, %s)", catlog, storeName); 
+    return new Promise(function(resolve, reject){
+      self.owner.stackConn.call("XSHARE.GetBucket", catlog, storeName).then((result)=>{
+        if (result.mode == 0) {
+          resolve(new Buffer(result.value,'base64'));
+        } else {
+          resolve(result.value);
+        }
+      }).catch((error)=>{
+        reject(error);
+      });
+    });
+  }
+
+  setBucket(catlog, storeName, rawData) {
+    let self = this;
+    var x, mode;
+    //console.log("XSHARE.setBucket(%s, %s)", catlog, storeName); 
+    if (Buffer.isBuffer(rawData)) {
+      x = rawData.toString('base64');
+      mode = 0;
+    } else {
+      x = "" + rawData;
+      mode = 1;
+    }
+    return self.owner.stackConn.call("XSHARE.SetBucket", catlog, storeName, x, mode);
+  }
+
+  removeBucket(catlog, storeName) {
+    let self = this;
+    //console.log("XSHARE.removeBucket(%s, %s)", catlog, storeName); 
+    return self.owner.stackConn.call("XSHARE.RemoveBucket", catlog, storeName);
+  }
+
+  listBucket(catlog) {
+    let self = this;
+    //console.log("XSHARE.listBucket(%s)", catlog); 
+    return self.owner.stackConn.call("XSHARE.ListBucket", catlog);
+  }
+  //xshare.on('bucketChanged', (catlog, storeName)=>{});
+
+
+}
 
 
 module.exports = new MoteBus();

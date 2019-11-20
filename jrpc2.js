@@ -4,13 +4,8 @@ const EventEmitter = require('events');
 
 const JRPCConnectTimeout = 3000;
 const JRPCReconnectTime = 2000;
-
-var jRPCInst;
-var jRPCip = '127.0.0.1';
-var jRPCport = 6060;
-var jRPCConn;
-var jRPCActive = false;
-var jRPCLineBuffer = '';
+const JRPCTTLTimeout1 = 20000;
+const JRPCTTLTimeout2 = 5000;
 
 
 var indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
@@ -41,7 +36,9 @@ class JRPC2 extends EventEmitter {
 		self.methodArgs = {};
 		self.modules = {};
 		self.context = {};
-		jRPCInst = self;
+		self.connected = false;
+		self.buffer = '';
+		self.socket = null;
 	}
 
 	doConnected() {
@@ -61,11 +58,22 @@ class JRPC2 extends EventEmitter {
 		//console.log('====> ' + msg);
 		var self = this;
         var obj = JSON.parse(msg);
-		if (obj.method) {
-			self.dispatchRequest(obj);
-		} else {
-			self.dispatchResult(obj);
-		}
+
+        if (Array.isArray(obj)) {
+        	obj.forEach(function(item, index){
+				if (item.method) {
+					self.dispatchRequest(item);
+				} else {
+					self.dispatchResult(item);
+				}
+        	});
+        } else {
+			if (obj.method) {
+				self.dispatchRequest(obj);
+			} else {
+				self.dispatchResult(obj);
+			}
+        }
 	}
 
 	
@@ -117,9 +125,9 @@ class JRPC2 extends EventEmitter {
 			}
 			var resp = JSON.stringify(data);
 
-			if (jRPCActive) {
+			if (self.connected) {
 				//console.log('<==== ', resp);
-				jRPCConn.write(resp+'\n');
+				self.socket.write(resp+'\n');
 			}
 		}
 
@@ -220,7 +228,7 @@ class JRPC2 extends EventEmitter {
 		});
 
 		return new Promise(function(resolve,reject){
-			if (jRPCActive) {
+			if (self.connected) {
 				var cb = function(err,result) {
 					if (err)
 						reject(err);
@@ -230,7 +238,7 @@ class JRPC2 extends EventEmitter {
 				self.callbacks[id] = cb;
 				//console.log('<==== ', req);
         		setImmediate(function(){
-          			jRPCConn.write(req+'\n');
+          			self.socket.write(req+'\n');
         		});
 			} else {
 				reject(systemError());
@@ -239,66 +247,108 @@ class JRPC2 extends EventEmitter {
 	}
 
 	get isConnected() {
-		return jRPCActive;
+		return self.connected;
 	}
 
-	connectTo( ip, port ) {
-		jRPCip = ip;
-		jRPCport = port;
-		setImmediate(SocketHandle);
-	}
-}
-
-
-function SocketHandle() {
-		var waitTimer;
+	_socketHandle() {
 		var self = this;
+		var waitTimer;
+		var ttlTimer1;
+		var ttlTimer2;
 
-		jRPCConn = new net.Socket(); 
-		//console.log('connecting...', jRPCip, ":", jRPCport);
-		jRPCConn.setEncoding('utf8');
-		jRPCConn.connect(jRPCport, jRPCip, ()=>{
+		function clearAllTimer() {
+			clearTimeout(waitTimer);
+			clearTimeout(ttlTimer1);
+			clearTimeout(ttlTimer2);
+		}
+
+		function startTTLTimer() {
+			ttlTimer1 = setTimeout(function(){
+				//console.log('sendTTL');
+				self.socket.write('\t\n');
+				ttlTimer2 = setTimeout(function(){
+					//console.log('TTL Timeout!!!');
+					self.socket.end();
+				}, JRPCTTLTimeout2);
+			}, JRPCTTLTimeout1);
+		}
+
+		function resetTTLTimer() {
+			clearTimeout(ttlTimer1);
+			clearTimeout(ttlTimer2);
+			startTTLTimer();
+		}
+
+		self.socket = new net.Socket(); 
+		//console.log('connecting...', self.hostIP, ":", self.hostPort);
+		self.socket.setEncoding('utf8');
+		self.socket.connect(self.hostPort, self.hostIP, ()=>{
 			clearTimeout(waitTimer);
 			//console.log('connected');
-			jRPCActive = true;
-			jRPCLineBuffer = '';
-			jRPCInst.doConnected();
+			self.connected = true;
+			self.buffer = '';
+			startTTLTimer();
+			self.doConnected();
 		})
 		.on('data', function(data) {
-			jRPCLineBuffer += data.toString();
-			//console.log( 'jRPCLineBuffer = ', jRPCLineBuffer );
-			if (jRPCLineBuffer.indexOf('\n') != -1) {
-				var lines = jRPCLineBuffer.split('\n');
-				jRPCLineBuffer = lines.pop();
+			resetTTLTimer();
+			self.buffer += data.toString();
+			//console.log( 'self.buffer = ', self.buffer );
+			if (self.buffer.indexOf('\n') != -1) {
+				var lines = self.buffer.split('\n');
+				self.buffer = lines.pop();
 				lines.forEach(function(line){
-					jRPCInst.doDispatch(line);
+					if (line != "") {
+						if (line == "\t") {
+							//console.log('recvTTL');
+							//console.log('sendACK');
+							self.socket.write('\b\n');
+						} else if (line == "\b") {	
+							//console.log('recvACK');
+						} else
+							self.doDispatch(line);
+					}
 				},this)
 			}
 		})
 		.on('error', function(err) {
 			clearTimeout(waitTimer);
 			if ((err.code == "ECONNREFUSED") || (err.code == "ECONNRESET")) {
-				console.log( "!!! Please check that the MoteBus program is running.");	
+				console.log( "!!! Please check that the %s program is running.", self.svrName);	
 			}
 			else
 				console.log('error: ',err.code);
 		})
 		.on('close', function() {
-			if (jRPCActive) {
-				jRPCActive = false;
-				//console.log('disconnected');	
-				jRPCInst.doDisconneced();
+			if (self.connected) {
+				self.connected = false;
+				//console.log('disconnected');
+				clearAllTimer();
+				self.doDisconneced();
 			}
-			setTimeout( SocketHandle, JRPCReconnectTime);
+			setTimeout( ()=>{self._socketHandle()}, JRPCReconnectTime);
 		});
 
 		waitTimer = setTimeout(function(){
 			//console.log('connect timeout');
-			jRPCConn.destroy();			
-			jRPCConn = null;
+			self.socket.destroy();			
+			self.socket = null;
 
 		}, JRPCConnectTimeout);
+	}
+
+	connectTo( ip, port, svr ) {
+		//console.log('connectTo(%s:%d)', ip, port);
+		var self = this;
+		self.hostIP = ip;
+		self.hostPort = port;
+		self.svrName = svr;
+		setImmediate( ()=>{self._socketHandle()} );
+	}
+
 }
+
+
 
 
 module.exports.create = function() {
