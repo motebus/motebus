@@ -51,9 +51,9 @@ class MoteBus extends EventEmitter {
       self.emit('off');
       //console.log('MoteBus.disconnected.');
     })
-    .expose('XMSG.RecvMessage', function(idCode,msg){
+    .expose('XMSG.RecvMessage', function(userid,msg){
       //console.log('XMsg.RecvMessage( %s, %s )', idCode, util.inspect(msg,false,null));
-      var mma = self.MMA[idCode];
+      var mma = self.MMA[userid];
       if ((mma != null) && typeof mma === 'object') {
         setImmediate(function(){
           mma.recvMessage(msg);  
@@ -61,9 +61,9 @@ class MoteBus extends EventEmitter {
       }
       return "OK";
     })
-    .expose('XMSG.RecvTKInfo', function(idCode,info){
+    .expose('XMSG.RecvTKInfo', function(userid,info){
       //console.log('XMsg.RecvTKInfo( %s, %s )', idCode, util.inspect(info,false,null));
-      var mma = self.MMA[idCode];
+      var mma = self.MMA[userid];
       if ((mma != null) && typeof mma === 'object') {
         setImmediate(function(){
           mma.recvTKInfo(info);
@@ -88,19 +88,19 @@ class MoteBus extends EventEmitter {
 
       return func.apply(self, params);
     })
-    .expose('XSHARE.RecvConfigChanged', function(catlog, keypath){
-      if (self._xshare) 
-        self._xshare.emit('configChanged', catlog, keypath);
+    .expose('XSTORAGE.RecvConfigChanged', function(catlog, keypath){
+      if (self._xstorage) 
+        self._xstorage.emit('configChanged', catlog, keypath);
       return "OK";
     })
-    .expose('XSHARE.RecvSecretChanged', function(catlog, keypath){
-      if (self._xshare) 
-        self._xshare.emit('secretChanged', catlog, keypath);
+    .expose('XSTORAGE.RecvSecretChanged', function(catlog, keypath){
+      if (self._xstorage) 
+        self._xstorage.emit('secretChanged', catlog, keypath);
       return "OK";
     })
-    .expose('XSHARE.RecvBucketChanged', function(catlog, storename){
-      if (self._xshare) 
-        self._xshare.emit('bucketChanged', catlog, storename);
+    .expose('XSTORAGE.RecvBucketChanged', function(catlog, storename){
+      if (self._xstorage) 
+        self._xstorage.emit('bucketChanged', catlog, storename);
       return "OK";
     })
     .expose('CORE.RecvHostState', function(udid,online,reason){
@@ -133,10 +133,18 @@ class MoteBus extends EventEmitter {
 
   xSHARE() {
     let self = this;
-    if (!self._xshare)
-      self._xshare = new XSHARE(this);
-    return self._xshare;
+    if (!self._xstorage)
+      self._xstorage = new XSTORAGE(this);
+    return self._xstorage;
   }
+
+  xSTORAGE() {
+    let self = this;
+    if (!self._xstorage)
+      self._xstorage = new XSTORAGE(this);
+    return self._xstorage;
+  }
+
 
   getInfo() {
     let self = this;
@@ -211,7 +219,7 @@ class XMSG extends EventEmitter {
     let self = this;
     //console.log("XMSG.create()");
     self.owner = owner;
-    self.idCode = '';
+    self.userId = '';
     self.trackCB = {};
   }
 
@@ -233,17 +241,21 @@ class XMSG extends EventEmitter {
     }
   }
 
-
-  open(alias, password, unque, callback) {
+  getUserId() {
     let self = this;
-    //console.log("XMSG.open(%s,%s,%s)", alias, password, unque);
-    self.owner.stackConn.call('XMSG.Open', alias, password, unque )
+    return self.userId;
+  }
+
+  open(userid, password, unque, callback) {
+    let self = this;
+    //console.log("XMSG.open(%s,%s,%s)", userid, password, unque);
+    self.owner.stackConn.call('XMSG.Open', userid, password, unque )
     .then((result)=>{
-        if (self.idCode != '')
-          self.owner.unregMMA(self.idCode);
-        self.idCode = result; 
+        if (self.userId != '')
+          self.owner.unregMMA(self.userId);
+        self.userId = userid; 
         self.trackCB = {};
-        self.owner.regMMA(self.idCode, self);
+        self.owner.regMMA(self.userId, self);
         //console.log('XMsg.open result=', result);
         callback(null,result);
     })
@@ -253,15 +265,37 @@ class XMSG extends EventEmitter {
     });
   }
 
+  close() {
+    let self = this;
+    //console.log("XMSG.open(%s,%s,%s)", userid, password, unque);
+    self.owner.stackConn.call('XMSG.Close', self.userId )
+    .then((result)=>{
+        if (self.userId != '')
+          self.owner.unregMMA(self.userId);
+        self.userId = '';
+        self.trackCB = {};
+        //console.log('XMsg.open result=', result);
+        callback(null,result);
+    })
+    .catch((err)=>{
+        //console.log('XMsg.open error=', err);
+        callback(err);
+    });
+  }
 
   send(target, body, files, prio, timeout1, timeout2, callback) {
     let self = this;
     /*
     console.log("XMSG.send(%s, %s, %s, %s, %d, %d, %d)", 
-      self.idCode, target, util.inspect(body,false,null),
+      self.userId, target, util.inspect(body,false,null),
       util.inspect(files,false,null), prio, timeout1, timeout2);
     */
-    self.owner.stackConn.call('XMSG.Send', self.idCode, target, body, files, prio, timeout1, timeout2 )
+    if (!self.userId) {
+      self.userId = self.owner._appName;
+      self.owner.regMMA(self.userId, self);
+    }
+
+    self.owner.stackConn.call('XMSG.Send', self.userId, target, body, files, prio, timeout1, timeout2 )
     .then((result)=>{
       //console.log('XMsg.send result=', result);
       self.trackCB[result] = callback;
@@ -281,7 +315,12 @@ class XMSG extends EventEmitter {
       util.inspect(body,false,null),
       util.inspect(files,false,null),prio,timeout1,timeout2);
     */
-    self.owner.stackConn.call('XMSG.Reply', self.idCode, head, body, files, prio, timeout1, timeout2 )
+    if (!self.userId) {
+      self.userId = self.owner._appName;
+      self.owner.regMMA(self.userId, self);
+    }
+
+    self.owner.stackConn.call('XMSG.Reply', self.userId, head, body, files, prio, timeout1, timeout2 )
     .then((result)=>{
       //console.log('XMsg.reply result=', result);
       self.trackCB[result] = callback;
@@ -295,8 +334,12 @@ class XMSG extends EventEmitter {
   extract(msgid, path, callback) {
     let self = this;
     //console.log("XMSG.extract(%s, %s)", msgid, path); 
+    if (!self.userId) {
+      self.userId = self.owner._appName;
+      self.owner.regMMA(self.userId, self);
+    }
 
-    self.owner.stackConn.call('XMSG.Extract', self.idCode, msgid, path )
+    self.owner.stackConn.call('XMSG.Extract', self.userId, msgid, path )
     .then((result)=>{
       callback(null,result);
     })
@@ -348,8 +391,10 @@ class XRPC extends EventEmitter {
     let self = this;
     var names = Object.keys(module);
     return new Promise(function(resolve, reject){
-      self.owner.stackConn.call("XRPC.Isolated", names).then((userId)=>{
-        if (userId && userId.length>0) {
+      self.owner.stackConn.call("XRPC.Isolated", names).then((mma)=>{
+        if (mma && mma.length>0) {
+          let userId = mma.split(";")[0];
+          //console.log( "mma=%s, userId=%s", mma, userId);
           var methodName;
           for (methodName in module) {
             if ((typeof module[methodName] == "function") && (methodName !== "constructor")) {
@@ -359,7 +404,7 @@ class XRPC extends EventEmitter {
               self.owner.modules[userId][methodName] = module[methodName];
             }
           }
-          resolve("OK");
+          resolve(mma);
         } else {
           reject(systemError());
         }
@@ -390,72 +435,72 @@ class XRPC extends EventEmitter {
 }
 
 
-class XSHARE extends EventEmitter {
+class XSTORAGE extends EventEmitter {
   constructor(owner) {
     super();
     let self = this;
     self.owner = owner;
   }
 
-  //var xshare = motebus.xSHARE();
+  //var xstorage = motebus.xSTORAGE();
   getConfig(catlog, keypath) {
     let self = this;
-    //console.log("XSHARE.getConfig(%s, %s)", catlog, keypath); 
-    return self.owner.stackConn.call("XSHARE.GetConfig", catlog, keypath);
+    //console.log("XSTORAGE.getConfig(%s, %s)", catlog, keypath); 
+    return self.owner.stackConn.call("XSTORAGE.GetConfig", catlog, keypath);
   }
 
   setConfig(catlog, keypath, value) {
     let self = this;
-    //console.log("XSHARE.setConfig(%s, %s, %s)", catlog, keypath, value); 
-    return self.owner.stackConn.call("XSHARE.SetConfig", catlog, keypath, value);
+    //console.log("XSTORAGE.setConfig(%s, %s, %s)", catlog, keypath, value); 
+    return self.owner.stackConn.call("XSTORAGE.SetConfig", catlog, keypath, value);
   }
-  //xshare.on('configChanged', (catlog, keypath)=>{});
+  //xstorage.on('configChanged', (catlog, keypath)=>{});
 
   getSecret(catlog, keypath, password) {
     let self = this;
-    //console.log("XSHARE.getSecret(%s, %s, %s)", catlog, keypath, password); 
-    return self.owner.stackConn.call("XSHARE.GetSecret", catlog, keypath, password);
+    //console.log("XSTORAGE.getSecret(%s, %s, %s)", catlog, keypath, password); 
+    return self.owner.stackConn.call("XSTORAGE.GetSecret", catlog, keypath, password);
   }
 
   setSecret(catlog, keypath, value, password) {
     let self = this;
-    //console.log("XSHARE.setSecret(%s, %s, %s, %s)", catlog, keypath, value, password); 
-    return self.owner.stackConn.call("XSHARE.SetSecret", catlog, keypath, value, password);
+    //console.log("XSTORAGE.setSecret(%s, %s, %s, %s)", catlog, keypath, value, password); 
+    return self.owner.stackConn.call("XSTORAGE.SetSecret", catlog, keypath, value, password);
   }
-  //xshare.on('secretChanged', (catlog, keypath)=>{});
+  //xstorage.on('secretChanged', (catlog, keypath)=>{});
 
 
   getCached(catlog, idname) {
     let self = this;
-    //console.log("XSHARE.getCached(%s, %s)", catlog, idname); 
-    return self.owner.stackConn.call("XSHARE.GetCached", catlog, idname);
+    //console.log("XSTORAGE.getCached(%s, %s)", catlog, idname); 
+    return self.owner.stackConn.call("XSTORAGE.GetCached", catlog, idname);
   }
 
   setCached(catlog, idname, value) {
     let self = this;
-    //console.log("XSHARE.setCached(%s, %s, %s)", catlog, idname, value); 
-    return self.owner.stackConn.call("XSHARE.SetCached", catlog, idname, value);
+    //console.log("XSTORAGE.setCached(%s, %s, %s)", catlog, idname, value); 
+    return self.owner.stackConn.call("XSTORAGE.SetCached", catlog, idname, value);
   }
 
   removeCached(catlog, idname) {
     let self = this;
-    //console.log("XSHARE.removeCached(%s, %s)", catlog, idname); 
-    return self.owner.stackConn.call("XSHARE.RemoveCached", catlog, idname);
+    //console.log("XSTORAGE.removeCached(%s, %s)", catlog, idname); 
+    return self.owner.stackConn.call("XSTORAGE.RemoveCached", catlog, idname);
   }
 
   clearCached(catlog) {
     let self = this;
-    //console.log("XSHARE.clearCached(%s)", catlog); 
-    return self.owner.stackConn.call("XSHARE.ClearCached", catlog);
+    //console.log("XSTORAGE.clearCached(%s)", catlog); 
+    return self.owner.stackConn.call("XSTORAGE.ClearCached", catlog);
   }
 
 
 
   getBucket(catlog, storeName) {
     let self = this;
-    //console.log("XSHARE.getBucket(%s, %s)", catlog, storeName); 
+    //console.log("XSTORAGE.getBucket(%s, %s)", catlog, storeName); 
     return new Promise(function(resolve, reject){
-      self.owner.stackConn.call("XSHARE.GetBucket", catlog, storeName).then((result)=>{
+      self.owner.stackConn.call("XSTORAGE.GetBucket", catlog, storeName).then((result)=>{
         if (result.mode == 0) {
           resolve(new Buffer(result.value,'base64'));
         } else {
@@ -470,7 +515,7 @@ class XSHARE extends EventEmitter {
   setBucket(catlog, storeName, rawData) {
     let self = this;
     var x, mode;
-    //console.log("XSHARE.setBucket(%s, %s)", catlog, storeName); 
+    //console.log("XSTORAGE.setBucket(%s, %s)", catlog, storeName); 
     if (Buffer.isBuffer(rawData)) {
       x = rawData.toString('base64');
       mode = 0;
@@ -478,21 +523,21 @@ class XSHARE extends EventEmitter {
       x = "" + rawData;
       mode = 1;
     }
-    return self.owner.stackConn.call("XSHARE.SetBucket", catlog, storeName, x, mode);
+    return self.owner.stackConn.call("XSTORAGE.SetBucket", catlog, storeName, x, mode);
   }
 
   removeBucket(catlog, storeName) {
     let self = this;
-    //console.log("XSHARE.removeBucket(%s, %s)", catlog, storeName); 
-    return self.owner.stackConn.call("XSHARE.RemoveBucket", catlog, storeName);
+    //console.log("XSTORAGE.removeBucket(%s, %s)", catlog, storeName); 
+    return self.owner.stackConn.call("XSTORAGE.RemoveBucket", catlog, storeName);
   }
 
   listBucket(catlog) {
     let self = this;
-    //console.log("XSHARE.listBucket(%s)", catlog); 
-    return self.owner.stackConn.call("XSHARE.ListBucket", catlog);
+    //console.log("XSTORAGE.listBucket(%s)", catlog); 
+    return self.owner.stackConn.call("XSTORAGE.ListBucket", catlog);
   }
-  //xshare.on('bucketChanged', (catlog, storeName)=>{});
+  //xstorage.on('bucketChanged', (catlog, storeName)=>{});
 
 
 }

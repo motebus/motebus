@@ -230,6 +230,7 @@ class JRPC2 extends EventEmitter {
 		return new Promise(function(resolve,reject){
 			if (self.connected) {
 				var cb = function(err,result) {
+					//console.log('cb err=',err,' ,result=', result);
 					if (err)
 						reject(err);
 					else
