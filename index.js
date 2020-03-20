@@ -26,6 +26,7 @@ class MoteBus extends EventEmitter {
   constructor() {
     super();
     let self = this;
+    self._started = false;
     self._stackConnOK = false;
     self._appName = "";
     self._multiInst = false;
@@ -205,9 +206,10 @@ class MoteBus extends EventEmitter {
     }
 
     //console.log(bsHost, bsPort);
-
-    if ((bsHost!="") && (bsPort!=0))
+    if ((!self._started) && (bsHost!="") && (bsPort!=0)) {
+      self._started = true;
       self.stackConn.connectTo( bsHost, bsPort, "mbStack" );
+    }
   }
 }
 
