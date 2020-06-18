@@ -212,6 +212,11 @@ class MoteBus extends EventEmitter {
       self.stackConn.connectTo( bsHost, bsPort, "mbStack" );
     }
   }
+
+  restart() {
+    let self = this;
+    self.stackConn.disconnect();
+  }
 }
 
 //=========================================

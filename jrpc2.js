@@ -347,6 +347,12 @@ class JRPC2 extends EventEmitter {
 		setImmediate( ()=>{self._socketHandle()} );
 	}
 
+	disconnect() {
+		var self = this;
+		if (self.connected && self.socket)
+			self.socket.end();
+	}
+
 }
 
 
